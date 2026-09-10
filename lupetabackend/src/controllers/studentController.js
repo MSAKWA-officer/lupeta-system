@@ -231,10 +231,25 @@ exports.getStudentById = async (req, res) => {
   }
 };
 
+// Treat an unparseable/empty date_of_birth or admission_date as "no date"
+// instead of letting a bad string (e.g. "Invalid date", "N/A", "") reach
+// Postgres and fail the whole insert — those columns are optional.
+function sanitizeDates(body) {
+  const clean = { ...body };
+  ['date_of_birth', 'admission_date'].forEach((field) => {
+    const value = clean[field];
+    if (value === undefined) return;
+    if (!value || isNaN(new Date(value))) {
+      clean[field] = null;
+    }
+  });
+  return clean;
+}
+
 // POST /api/students
 exports.createStudent = async (req, res) => {
   try {
-    const student = await Student.create(req.body);
+    const student = await Student.create(sanitizeDates(req.body));
     res.status(201).json(student);
   } catch (err) {
     console.error('createStudent failed:', err);
@@ -258,9 +273,14 @@ exports.updateStudent = async (req, res) => {
   try {
     const student = await Student.findByPk(req.params.id);
     if (!student) return res.status(404).json({ message: 'Student not found.' });
-    await student.update(req.body);
+    await student.update(sanitizeDates(req.body));
     res.json(student);
   } catch (err) {
+    console.error('updateStudent failed:', err);
+    if (err.name === 'SequelizeValidationError' && Array.isArray(err.errors) && err.errors.length) {
+      const detail = err.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+      return res.status(400).json({ message: `Failed to update the record. ${detail}`, error: err.message });
+    }
     res.status(400).json({ message: 'Failed to update the record.', error: err.message });
   }
 };

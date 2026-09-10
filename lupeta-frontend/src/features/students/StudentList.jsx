@@ -46,6 +46,10 @@ const HEADER_TO_FIELD = TEMPLATE_COLUMNS.reduce((map, col) => {
   return map;
 }, {});
 
+// A stray "N/A", "-", "unknown", or a literal "Invalid date" typed into a
+// cell should just mean "we don't know this date", not crash the whole row.
+const DATE_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 function toDateString(value) {
   // A blank cell must become `null`, not `''` — the date_of_birth /
   // admission_date columns are optional (allowNull) in the database, but an
@@ -53,10 +57,26 @@ function toDateString(value) {
   // it even though "no date at all" is perfectly fine. This was causing
   // every row with a blank date cell to fail on bulk upload.
   if (!value) return null;
-  if (value instanceof Date && !isNaN(value)) {
-    return value.toISOString().slice(0, 10);
+
+  if (value instanceof Date) {
+    // Excel/XLSX can hand back an invalid Date object (e.g. from a stray
+    // formula error or an out-of-range serial number) — treat that the
+    // same as "no date" instead of forwarding "Invalid Date" as text.
+    return isNaN(value) ? null : value.toISOString().slice(0, 10);
   }
-  return String(value).trim() || null;
+
+  const text = String(value).trim();
+  if (!text) return null;
+
+  // Already in the expected YYYY-MM-DD shape.
+  if (DATE_REGEX.test(text)) return text;
+
+  // Anything else (free text, "Invalid date", a differently-formatted
+  // date, etc.) — try to parse it, but never let unparseable text reach
+  // the database. Better to import the student with a missing date than
+  // to fail the whole row over one bad cell.
+  const parsed = new Date(text);
+  return isNaN(parsed) ? null : parsed.toISOString().slice(0, 10);
 }
 
 // Turns one raw row object (as read from the sheet, keyed by whatever headers
