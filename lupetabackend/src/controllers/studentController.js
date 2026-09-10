@@ -237,8 +237,17 @@ exports.createStudent = async (req, res) => {
     const student = await Student.create(req.body);
     res.status(201).json(student);
   } catch (err) {
+    console.error('createStudent failed:', err);
     if (err.name === 'SequelizeUniqueConstraintError') {
       return res.status(409).json({ message: 'This admission number already exists.' });
+    }
+    // SequelizeValidationError lists exactly which field(s) failed and why
+    // (e.g. a bad date, an empty required column, an enum value that isn't
+    // "male"/"female"). Surface that instead of a generic message so the
+    // person uploading an Excel sheet can actually see what to fix.
+    if (err.name === 'SequelizeValidationError' && Array.isArray(err.errors) && err.errors.length) {
+      const detail = err.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+      return res.status(400).json({ message: `Failed to add the student. ${detail}`, error: err.message });
     }
     res.status(400).json({ message: 'Failed to add the student.', error: err.message });
   }

@@ -47,11 +47,16 @@ const HEADER_TO_FIELD = TEMPLATE_COLUMNS.reduce((map, col) => {
 }, {});
 
 function toDateString(value) {
-  if (!value) return '';
+  // A blank cell must become `null`, not `''` — the date_of_birth /
+  // admission_date columns are optional (allowNull) in the database, but an
+  // empty string is not a valid DATEONLY value, so Sequelize/Postgres reject
+  // it even though "no date at all" is perfectly fine. This was causing
+  // every row with a blank date cell to fail on bulk upload.
+  if (!value) return null;
   if (value instanceof Date && !isNaN(value)) {
     return value.toISOString().slice(0, 10);
   }
-  return String(value).trim();
+  return String(value).trim() || null;
 }
 
 // Turns one raw row object (as read from the sheet, keyed by whatever headers
@@ -199,10 +204,14 @@ export default function StudentList() {
           await studentsApi.create(student);
           added += 1;
         } catch (err) {
+          // Prefer the backend's detailed validation message (which names the
+          // exact field and reason) over the generic one, so a failed row is
+          // actually diagnosable from the summary box instead of just "Failed to save."
+          const detail = err.response?.data?.message || err.response?.data?.error;
           failed.push({
             row: i + 2,
             name: rowLabel,
-            message: err.response?.data?.message || 'Failed to save.',
+            message: detail || 'Failed to save.',
           });
         }
       }
