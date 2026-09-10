@@ -379,7 +379,7 @@ export default function ClassDivisionReportPage() {
             </span>
           </h4>
 
-          <table className="mt-3 w-full border-collapse text-sm">
+          <table className="mt-3 w-full border-collapse text-[12px]">
             {/* Column widths: everything narrow/tight to its content — only
                 "Detailed Subjects" (the widest, most-important cell) gets the
                 extra room. */}
