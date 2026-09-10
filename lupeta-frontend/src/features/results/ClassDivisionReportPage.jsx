@@ -380,50 +380,56 @@ export default function ClassDivisionReportPage() {
           </h4>
 
           <table className="mt-3 w-full border-collapse text-sm">
+            {/* Column widths: everything narrow/tight to its content — only
+                "Detailed Subjects" (the widest, most-important cell) gets the
+                extra room. */}
             <colgroup>
-              <col style={{ width: '14%' }} />
-              <col style={{ width: '20%' }} />
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '17%' }} />
+              <col style={{ width: '5%' }} />
               <col style={{ width: '6%' }} />
-              <col style={{ width: '7%' }} />
-              <col style={{ width: '6%' }} />
-              <col style={{ width: '47%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '56%' }} />
             </colgroup>
             <thead>
               <tr>
-                <th className="border border-slate-400 bg-sky-200 px-3 py-2 text-left font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-left font-bold uppercase text-slate-900">
                   Candidate Number
                 </th>
-                <th className="border border-slate-400 bg-sky-200 px-3 py-2 text-left font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-left font-bold uppercase text-slate-900">
                   Student Name
                 </th>
-                <th className="border border-slate-400 bg-sky-200 px-3 py-2 text-center font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-center font-bold uppercase text-slate-900">
                   Sex
                 </th>
-                <th className="border border-slate-400 bg-sky-200 px-3 py-2 text-center font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-center font-bold uppercase text-slate-900">
                   Agg
                 </th>
-                <th className="border border-slate-400 bg-sky-200 px-3 py-2 text-center font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-center font-bold uppercase text-slate-900">
                   Div
                 </th>
-                <th className="border border-slate-400 bg-sky-200 px-3 py-2 text-center font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-center font-bold uppercase text-slate-900">
                   Detailed Subjects
                 </th>
               </tr>
             </thead>
             <tbody>
               {(report.students || []).map((s, idx) => (
-                <tr key={s.candidate_number || idx} className={idx % 2 === 1 ? 'bg-sky-50' : 'bg-white'}>
-                  <td className="border border-slate-300 px-3 py-2 align-top">{s.candidate_number}</td>
-                  <td className="border border-slate-300 px-3 py-2 align-top font-medium">{s.name}</td>
-                  <td className="border border-slate-300 px-3 py-2 text-center align-top">{s.sex}</td>
-                  <td className="border border-slate-300 px-3 py-2 text-center align-top">{s.agg ?? '—'}</td>
-                  <td className="border border-slate-300 px-3 py-2 text-center align-top">{s.div ?? '—'}</td>
-                  <td className="border border-slate-300 px-3 py-2 align-top">{detailedSubjectsText(s.subjects)}</td>
+                <tr
+                  key={s.candidate_number || idx}
+                  className={s.absent ? 'bg-red-50 text-red-700' : idx % 2 === 1 ? 'bg-sky-50' : 'bg-white'}
+                >
+                  <td className="border border-slate-300 px-2 py-1 align-top">{s.candidate_number}</td>
+                  <td className="border border-slate-300 px-2 py-1 align-top font-medium">{s.name}</td>
+                  <td className="border border-slate-300 px-2 py-1 text-center align-top">{s.sex}</td>
+                  <td className="border border-slate-300 px-2 py-1 text-center align-top">{s.agg ?? '—'}</td>
+                  <td className="border border-slate-300 px-2 py-1 text-center align-top">{s.div ?? '—'}</td>
+                  <td className="border border-slate-300 px-2 py-1 align-top">{detailedSubjectsText(s.subjects)}</td>
                 </tr>
               ))}
               {(!report.students || report.students.length === 0) && (
                 <tr>
-                  <td colSpan="6" className="border border-slate-300 px-3 py-8 text-center text-slate-400">
+                  <td colSpan="6" className="border border-slate-300 px-2 py-8 text-center text-slate-400">
                     No results to show for the selected class/exam.
                   </td>
                 </tr>

@@ -467,8 +467,17 @@ async function buildDivisionReport(enrollments, exam) {
     });
   }
 
-  // Sort by name, matching the printed sheet convention.
-  studentRows.sort((a, b) => a.name.localeCompare(b.name));
+  // Sort by candidate/admission number (e.g. S3137-0001, S3137-0002, ...),
+  // numeric-aware so the numeric part orders correctly even without
+  // zero-padding (S3137-9 before S3137-10). `candidate_number` here is
+  // always the student's admission_number (Student has no separate
+  // candidate_number field — see the push() above).
+  studentRows.sort((a, b) =>
+    String(a.candidate_number || '').localeCompare(String(b.candidate_number || ''), undefined, {
+      numeric: true,
+      sensitivity: 'base',
+    })
+  );
 
   // --- Division Performance Summary (by sex) ---------------------------
   const blankTally = () => ({ I: 0, II: 0, III: 0, IV: 0, zero: 0 });
