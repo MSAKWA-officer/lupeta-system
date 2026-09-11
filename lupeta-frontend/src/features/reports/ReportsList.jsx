@@ -104,12 +104,27 @@ export default function ReportsList() {
   }
 
   const filteredStudents = useMemo(() => {
-    if (!search.trim()) return students;
-    const q = search.trim().toLowerCase();
-    return students.filter(
-      (s) =>
-        studentName(s).toLowerCase().includes(q) ||
-        String(s.admission_number || '').toLowerCase().includes(q)
+    const base = search.trim()
+      ? students.filter((s) => {
+          const q = search.trim().toLowerCase();
+          return (
+            studentName(s).toLowerCase().includes(q) ||
+            String(s.admission_number || '').toLowerCase().includes(q)
+          );
+        })
+      : students;
+
+    // Sort by admission number so the list/table/print/export/SMS order is
+    // always predictable, regardless of the order students were added or
+    // returned by the API. `localeCompare` with `numeric: true` handles
+    // admission numbers that mix letters and digits correctly (e.g.
+    // "S3137-0002" sorts before "S3137-0010", not after it as plain string
+    // comparison would).
+    return [...base].sort((a, b) =>
+      String(a.admission_number || '').localeCompare(String(b.admission_number || ''), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      })
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [students, search]);
@@ -187,12 +202,24 @@ export default function ReportsList() {
             </p>
           </div>
           {!routeClassId && (
-            <Link
-              to="/dashboard/reports/division/school"
-              className="no-print flex items-center gap-2 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
-            >
-              <ClipboardList size={15} /> View School Division Report
-            </Link>
+            <div className="no-print flex flex-wrap gap-2">
+              <Link
+                to="/dashboard/reports/division/school"
+                className="flex items-center gap-2 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
+              >
+                <ClipboardList size={15} /> View School Division Report
+              </Link>
+              {/* Teacher/subject ranking (best to lowest) for one exam —
+                  exam-wide like the School Division Report above, not tied
+                  to a single class, so it lives next to it here rather than
+                  down in the per-class toolbar. */}
+              <Link
+                to="/dashboard/reports/teacher-performance"
+                className="flex items-center gap-2 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50"
+              >
+                <ClipboardList size={15} /> View Teacher Performance Report
+              </Link>
+            </div>
           )}
         </div>
 

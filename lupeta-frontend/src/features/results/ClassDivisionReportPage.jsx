@@ -207,6 +207,19 @@ export default function ClassDivisionReportPage() {
             page-break-inside: avoid;
             break-inside: avoid;
           }
+          /* Squeeze every student row down as tight as possible so a full
+             class (~30 students) fits on one printed sheet, and never let a
+             row split across a page break mid-student. */
+          .student-results-table tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .student-results-table td,
+          .student-results-table th {
+            padding-top: 1px !important;
+            padding-bottom: 1px !important;
+            line-height: 1.15 !important;
+          }
         }
       `}</style>
 
@@ -379,36 +392,37 @@ export default function ClassDivisionReportPage() {
             </span>
           </h4>
 
-          <table className="mt-3 w-full border-collapse text-[12px]">
-            {/* Column widths: everything narrow/tight to its content — only
-                "Detailed Subjects" (the widest, most-important cell) gets the
-                extra room. */}
+          <table className="student-results-table mt-3 w-full border-collapse text-[11px]">
+            {/* Column widths: the first five columns (Candidate Number,
+                Student Name, Sex, Agg, Div) are pulled in as tight as their
+                content allows, so "Detailed Subjects" starts noticeably
+                sooner and gets almost all the remaining width. */}
             <colgroup>
-              <col style={{ width: '11%' }} />
-              <col style={{ width: '17%' }} />
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '6%' }} />
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '56%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '4%' }} />
+              <col style={{ width: '4%' }} />
+              <col style={{ width: '4%' }} />
+              <col style={{ width: '66%' }} />
             </colgroup>
             <thead>
               <tr>
-                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-left font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-1 py-0.5 text-left font-bold uppercase text-slate-900">
                   Candidate Number
                 </th>
-                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-left font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-1 py-0.5 text-left font-bold uppercase text-slate-900">
                   Student Name
                 </th>
-                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-center font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-1 py-0.5 text-center font-bold uppercase text-slate-900">
                   Sex
                 </th>
-                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-center font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-1 py-0.5 text-center font-bold uppercase text-slate-900">
                   Agg
                 </th>
-                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-center font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-1 py-0.5 text-center font-bold uppercase text-slate-900">
                   Div
                 </th>
-                <th className="border border-slate-400 bg-sky-200 px-2 py-1 text-center font-bold uppercase text-slate-900">
+                <th className="border border-slate-400 bg-sky-200 px-1 py-0.5 text-center font-bold uppercase text-slate-900">
                   Detailed Subjects
                 </th>
               </tr>
@@ -419,12 +433,19 @@ export default function ClassDivisionReportPage() {
                   key={s.candidate_number || idx}
                   className={s.absent ? 'bg-red-50 text-red-700' : idx % 2 === 1 ? 'bg-sky-50' : 'bg-white'}
                 >
-                  <td className="border border-slate-300 px-2 py-1 align-top">{s.candidate_number}</td>
-                  <td className="border border-slate-300 px-2 py-1 align-top font-medium">{s.name}</td>
-                  <td className="border border-slate-300 px-2 py-1 text-center align-top">{s.sex}</td>
-                  <td className="border border-slate-300 px-2 py-1 text-center align-top">{s.agg ?? '—'}</td>
-                  <td className="border border-slate-300 px-2 py-1 text-center align-top">{s.div ?? '—'}</td>
-                  <td className="border border-slate-300 px-2 py-1 align-top">{detailedSubjectsText(s.subjects)}</td>
+                  <td className="border border-slate-300 px-1 py-0.5 align-middle whitespace-nowrap">{s.candidate_number}</td>
+                  {/* whitespace-nowrap keeps first/middle/last name on one
+                      single horizontal line instead of wrapping down the
+                      cell — the column is sized to fit a normal full name;
+                      an unusually long one will shrink to fit via the
+                      overflow rule below rather than wrap vertically. */}
+                  <td className="border border-slate-300 px-1 py-0.5 align-middle font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                    {s.name}
+                  </td>
+                  <td className="border border-slate-300 px-1 py-0.5 text-center align-middle">{s.sex}</td>
+                  <td className="border border-slate-300 px-1 py-0.5 text-center align-middle">{s.agg ?? '—'}</td>
+                  <td className="border border-slate-300 px-1 py-0.5 text-center align-middle">{s.div ?? '—'}</td>
+                  <td className="border border-slate-300 px-1 py-0.5 align-middle">{detailedSubjectsText(s.subjects)}</td>
                 </tr>
               ))}
               {(!report.students || report.students.length === 0) && (
@@ -436,6 +457,14 @@ export default function ClassDivisionReportPage() {
               )}
             </tbody>
           </table>
+
+          {/* Footer line: who generated this report and exactly when. Only
+              meaningful at the moment of printing/exporting, so it's
+              computed fresh each render rather than stored anywhere. */}
+          <p className="mt-2 text-right text-[10px] italic text-slate-500">
+            The report generated by Lupeta Secondary School — {new Date().toLocaleDateString()}{' '}
+            {new Date().toLocaleTimeString()}
+          </p>
 
           {/* --------------------------------------------------------------
               Examination Centre Overall Performance Summary, Division

@@ -8,6 +8,8 @@ const {
   SchoolClass,
   Enrollment,
   EnrollmentSubject,
+  Teacher,
+  ClassSubject,
 } = require('../models');
 const { Op } = require('sequelize');
 
@@ -456,6 +458,10 @@ async function buildDivisionReport(enrollments, exam) {
     }
 
     studentRows.push({
+      // Only used internally (e.g. by buildTeacherPerformanceReport, to
+      // look up this student's overall division) — not rendered on the
+      // Division Performance report itself.
+      student_id: student.id,
       candidate_number: student.candidate_number || student.admission_number,
       name: studentFullName(student),
       sex: student.gender === 'female' ? 'F' : 'M',
@@ -553,6 +559,139 @@ async function buildDivisionReport(enrollments, exam) {
   };
 }
 
+// Teacher-by-subject performance ranking for one exam: for every
+// teacher/subject combination taught during that exam's academic year,
+// tallies how many of that teacher's students scored each grade (A-F) in
+// that subject for this exam, and — separately — how many of those same
+// students landed in each overall division (I-IV, 0), reusing the exact
+// same best-7-subjects division logic as the Division Performance reports
+// above. Rows are then ranked best-to-worst by average grade points
+// (NECTA-style: lower points = better), from Position 1 downward.
+async function buildTeacherPerformanceReport(exam) {
+  const academicYearId = exam.Term?.academic_year_id;
+  const meta = {
+    exam_name: exam.name,
+    year_name: exam.Term?.AcademicYear?.year_name || null,
+  };
+
+  const classSubjects = await ClassSubject.findAll({
+    where: { academic_year_id: academicYearId, teacher_id: { [Op.ne]: null } },
+    include: [{ model: Subject }, { model: Teacher }],
+  });
+  if (!classSubjects.length) return { meta, rows: [] };
+
+  const enrollments = await Enrollment.findAll({
+    where: { academic_year_id: academicYearId },
+    include: [{ model: Student }],
+  });
+  if (!enrollments.length) return { meta, rows: [] };
+
+  // Same division-per-student numbers the Division Performance reports
+  // show, computed once across the whole year group so every teacher's
+  // slice below is directly comparable to it.
+  const overall = await buildDivisionReport(enrollments, exam);
+  const divByStudentId = new Map();
+  overall.students.forEach((s) => {
+    if (s.student_id != null) divByStudentId.set(s.student_id, s.div);
+  });
+
+  const enrollmentSubjects = await EnrollmentSubject.findAll({
+    where: { enrollment_id: { [Op.in]: enrollments.map((e) => e.id) } },
+  });
+  const subjectIdsByEnrollmentId = new Map();
+  enrollmentSubjects.forEach((es) => {
+    if (!subjectIdsByEnrollmentId.has(es.enrollment_id)) {
+      subjectIdsByEnrollmentId.set(es.enrollment_id, new Set());
+    }
+    subjectIdsByEnrollmentId.get(es.enrollment_id).add(es.subject_id);
+  });
+
+  const results = await Result.findAll({ where: { exam_id: exam.id } });
+  const gradeByStudentSubject = new Map();
+  results.forEach((r) => gradeByStudentSubject.set(`${r.student_id}-${r.subject_id}`, r.grade));
+
+  const blankGrades = () => ({ A: 0, B: 0, C: 0, D: 0, F: 0 });
+  const blankDivisions = () => ({ I: 0, II: 0, III: 0, IV: 0, 0: 0 });
+  const groups = new Map(); // `${teacher_id}-${subject_id}` -> tally
+
+  classSubjects.forEach((cs) => {
+    if (!cs.Teacher || !cs.Subject) return;
+
+    // Every enrollment in this ClassSubject's class — and, if the
+    // allocation is stream-specific, only that stream; a null stream_id
+    // on the ClassSubject means "all streams of this class".
+    const relevantEnrollments = enrollments.filter(
+      (e) =>
+        String(e.school_class_id) === String(cs.school_class_id) &&
+        (cs.stream_id == null || String(e.stream_id) === String(cs.stream_id))
+    );
+
+    const key = `${cs.teacher_id}-${cs.subject_id}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        teacher_name: cs.Teacher.full_name,
+        subject_code: cs.Subject.code || cs.Subject.name,
+        subject_name: cs.Subject.name,
+        grades: blankGrades(),
+        divisions: blankDivisions(),
+        pointsSum: 0,
+        sat: 0,
+      });
+    }
+    const group = groups.get(key);
+
+    relevantEnrollments.forEach((enrollment) => {
+      const student = enrollment.Student;
+      if (!student) return;
+
+      // A student counts toward this teacher/subject if they're registered
+      // for the subject; if EnrollmentSubject was never set up for them,
+      // fall back to "they have a result for it" so nobody silently drops
+      // out of the ranking over missing setup data.
+      const registeredSubjects = subjectIdsByEnrollmentId.get(enrollment.id);
+      const grade = gradeByStudentSubject.get(`${student.id}-${cs.subject_id}`);
+      const isRegistered = registeredSubjects && registeredSubjects.size > 0 ? registeredSubjects.has(cs.subject_id) : true;
+      if (!isRegistered || !grade) return;
+
+      group.sat += 1;
+      if (group.grades[grade] != null) group.grades[grade] += 1;
+      const points = GRADE_POINTS[grade];
+      if (points != null) group.pointsSum += points;
+
+      const div = divByStudentId.get(student.id);
+      if (div != null) {
+        const divKey = div === '0' ? 0 : div;
+        if (group.divisions[divKey] != null) group.divisions[divKey] += 1;
+      }
+    });
+  });
+
+  const rows = Array.from(groups.values())
+    .filter((g) => g.sat > 0)
+    .map((g) => ({
+      teacher_name: g.teacher_name,
+      subject_code: g.subject_code,
+      subject_name: g.subject_name,
+      sat: g.sat,
+      grades: g.grades,
+      divisions: g.divisions,
+      gpa: g.sat ? g.pointsSum / g.sat : null,
+    }));
+
+  // Best (lowest average points) first — ties keep their relative order.
+  rows.sort((a, b) => {
+    if (a.gpa == null && b.gpa == null) return 0;
+    if (a.gpa == null) return 1;
+    if (b.gpa == null) return -1;
+    return a.gpa - b.gpa;
+  });
+  rows.forEach((r, idx) => {
+    r.position = idx + 1;
+  });
+
+  return { meta, rows };
+}
+
 // GET /api/results/class-report?exam_id=&school_class_id=&stream_id=
 exports.getClassResultsReport = async (req, res) => {
   try {
@@ -600,5 +739,24 @@ exports.getSchoolResultsReport = async (req, res) => {
     res.json(report);
   } catch (err) {
     res.status(500).json({ message: 'Failed to build the school results report.', error: err.message });
+  }
+};
+
+// GET /api/results/teacher-report?exam_id=
+// Ranks every teacher/subject combination for that exam's academic year,
+// best to worst, with their students' grade (A-F) and division (I-IV, 0)
+// breakdowns — see buildTeacherPerformanceReport above for how it's built.
+exports.getTeacherPerformanceReport = async (req, res) => {
+  try {
+    const { exam_id } = req.query;
+    if (!exam_id) return res.status(400).json({ message: 'exam_id is required.' });
+
+    const exam = await Exam.findByPk(exam_id, { include: [{ model: Term, include: [{ model: AcademicYear }] }] });
+    if (!exam) return res.status(404).json({ message: 'Exam not found.' });
+
+    const report = await buildTeacherPerformanceReport(exam);
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to build the teacher performance report.', error: err.message });
   }
 };

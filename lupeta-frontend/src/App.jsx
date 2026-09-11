@@ -56,6 +56,7 @@ import AnnouncementView from './features/announcements/AnnouncementView';
 import ClassGatewayManager from './features/smsGateways/ClassGatewayManager';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import TeacherResultReport from './features/results/TeacherResultReport';
 
 export default function App() {
   return (
@@ -469,6 +470,16 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+
+            ...
+<Route
+  path="reports/teacher-performance"
+  element={
+    <ProtectedRoute roles={['admin', 'headteacher']}>
+      <TeacherResultReport />
+    </ProtectedRoute>
+  }
+/>
 
                         <Route
               path="sms-gateways"

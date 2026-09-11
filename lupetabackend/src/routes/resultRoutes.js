@@ -19,6 +19,8 @@ router.get(
 // NECTA-style Division Performance reports (whole class / whole school).
 router.get('/class-report', authorize('admin', 'headteacher'), resultController.getClassResultsReport);
 router.get('/school-report', authorize('admin', 'headteacher'), resultController.getSchoolResultsReport);
+// Same reasoning as above: must stay above "/:id".
+router.get('/teacher-report', authorize('admin', 'headteacher'), resultController.getTeacherPerformanceReport);
 router.get('/:id', authorize('admin', 'headteacher', 'teacher', 'staff'), resultController.getResultById);
 router.post('/', authorize('admin', 'headteacher', 'teacher'), resultController.createResult);
 router.put('/:id', authorize('admin', 'headteacher', 'teacher'), resultController.updateResult);

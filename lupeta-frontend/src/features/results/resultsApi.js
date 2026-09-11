@@ -13,4 +13,7 @@ export const resultsApi = {
   getClassReport: (params) => api.get('/results/class-report', { params }),
   // params: { exam_id }
   getSchoolReport: (params) => api.get('/results/school-report', { params }),
+  // Teacher/subject performance ranking, best to worst, for one exam.
+  // params: { exam_id }
+  getTeacherReport: (params) => api.get('/results/teacher-report', { params }),
 };
