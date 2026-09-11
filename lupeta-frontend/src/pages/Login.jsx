@@ -123,6 +123,13 @@ export default function Login() {
             </form>
           </div>
         </div>
+
+        {/* Footer — quiet attribution line at the bottom of the card, below
+            the login form. Year is computed automatically so it's never
+            stale. */}
+        <div className="border-t border-slate-100 bg-slate-50 px-8 py-4 text-center text-xs text-slate-500">
+          © {new Date().getFullYear()} Lupeta Secondary School. All rights reserved.
+        </div>
       </div>
     </div>
   );
