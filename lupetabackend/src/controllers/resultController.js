@@ -19,15 +19,21 @@ const includeRelations = [
   { model: Exam, include: [{ model: Term, include: [{ model: AcademicYear }] }] },
 ];
 
-// Simple grade based on the percentage of marks obtained
+// Simple grade based on the percentage of marks obtained.
+// Thresholds match the school's getGrade(marks) rule (A: 75-100, B: 65-74,
+// C: 45-64, D: 30-44, F: 0-29). Applied to the percentage rather than the
+// raw marks so it still works correctly for exams whose max_marks isn't
+// exactly 100 — when max_marks IS 100 (the normal case) the percentage
+// equals the raw marks, so behaviour is identical to the original rule.
 function computeGrade(marksObtained, maxMarks) {
   if (marksObtained == null || !maxMarks) return null;
   const pct = (marksObtained / maxMarks) * 100;
-  if (pct >= 80) return 'A';
+  if (pct >= 75 && pct <= 100) return 'A';
   if (pct >= 65) return 'B';
-  if (pct >= 50) return 'C';
-  if (pct >= 35) return 'D';
-  return 'F';
+  if (pct >= 45) return 'C';
+  if (pct >= 30) return 'D';
+  if (pct >= 0) return 'F';
+  return 'Invalid Marks';
 }
 
 // Points for each grade (NECTA O-Level style: A is the best = lowest points).
